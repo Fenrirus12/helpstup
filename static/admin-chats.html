@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prose Atelier Admin Chats</title>
+  <script>
+    (function () {
+      try {
+        if (window.localStorage.getItem("adminAuth")) {
+          document.documentElement.classList.add("admin-authenticated");
+        }
+      } catch (error) {
+        console.error("Unable to restore admin auth state", error);
+      }
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Prata&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="admin-body">
+  <div class="page-shell admin-shell">
+    <header class="site-header">
+      <a class="brand" href="/admin">
+        <span class="brand-mark">PA</span>
+        <span class="brand-text">Prose Atelier</span>
+      </a>
+      <nav class="site-nav admin-nav is-open">
+        <a href="/admin">Панель</a>
+        <a href="/">На сайт</a>
+      </nav>
+    </header>
+
+    <main class="admin-main">
+      <section class="admin-hero">
+        <div>
+          <p class="eyebrow">Чаты</p>
+          <h1>Переписка с пользователями</h1>
+          <p class="hero-text">Слева список пользователей, справа выбранный диалог. У каждого пользователя только один чат с администратором.</p>
+        </div>
+      </section>
+
+      <section class="chat-admin-layout">
+        <aside class="chat-admin-sidebar">
+          <div class="admin-sidebar-intro">
+            <p class="eyebrow">Диалоги</p>
+            <h2>Пользователи</h2>
+            <p class="admin-sidebar-text">Выберите пользователя, чтобы увидеть историю сообщений и ответить ему.</p>
+            <button class="button button-secondary" id="refresh-chat-list-button" type="button">Обновить список</button>
+          </div>
+          <div class="chat-user-list" id="chat-user-list">
+            <div class="chat-empty">Чаты появятся после авторизации администратора.</div>
+          </div>
+        </aside>
+
+        <section class="chat-admin-main">
+          <div class="chat-admin-head">
+            <div>
+              <p class="eyebrow">Окно чата</p>
+              <h2 id="chat-admin-title">Выберите пользователя</h2>
+              <p class="admin-panel-subtitle" id="chat-admin-subtitle">Пока диалог не выбран.</p>
+            </div>
+          </div>
+          <div class="chat-messages chat-messages-admin" id="admin-chat-messages">
+            <div class="chat-empty">Сообщения появятся после выбора пользователя.</div>
+          </div>
+          <form class="chat-form is-hidden" id="admin-chat-form">
+            <textarea name="text" rows="4" placeholder="Ответ пользователю" required></textarea>
+            <button class="button button-primary" type="submit">Отправить ответ</button>
+          </form>
+          <p class="form-status" id="admin-chat-status" aria-live="polite"></p>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="/admin-chats.js"></script>
+</body>
+</html>

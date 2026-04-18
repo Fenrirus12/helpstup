@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1,
+    "userId": 1,
+    "sender": "user",
+    "text": "Привет",
+    "createdAt": "2026-04-18T16:37:46.362002+00:00",
+    "readByAdmin": true,
+    "readByUser": true
+  },
+  {
+    "id": 2,
+    "userId": 1,
+    "sender": "admin",
+    "text": "Чё, надо?",
+    "createdAt": "2026-04-18T16:38:06.242047+00:00",
+    "readByAdmin": true,
+    "readByUser": true
+  },
+  {
+    "id": 3,
+    "userId": 1,
+    "sender": "user",
+    "text": "",
+    "createdAt": "2026-04-18T16:38:40.891037+00:00",
+    "readByAdmin": true,
+    "readByUser": true,
+    "attachment": {
+      "name": "Diplomnaya_rabota_Avkhadeev (2).docx",
+      "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "path": "/uploads/c69f856f94f7cfd118f6bb94.docx",
+      "size": 839083
+    }
+  },
+  {
+    "id": 4,
+    "userId": 1,
+    "sender": "admin",
+    "text": "?",
+    "createdAt": "2026-04-18T16:38:55.384776+00:00",
+    "readByAdmin": true,
+    "readByUser": true
+  }
+]
