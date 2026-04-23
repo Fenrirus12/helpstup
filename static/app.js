@@ -159,7 +159,7 @@ openRegisterButton?.addEventListener("click", () => openAuthPopover("register"))
 openResetButtons.forEach((button) => button.addEventListener("click", () => openAuthPopover("reset")));
 authTabs.forEach((tab) => tab.addEventListener("click", () => switchAuthTab(tab.dataset.authTab || "login")));
 
-document.addEventListener("click", (event) => {
+document.addEventListener("pointerdown", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement) || !authPopover) {
     return;

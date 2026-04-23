@@ -681,13 +681,21 @@ class AppHandler(BaseHTTPRequestHandler):
             if payload is None:
                 return
             text = str(payload.get("text", "")).strip()
-            if len(text) < 1:
+            attachment = payload.get("attachment")
+            if len(text) < 1 and not attachment:
                 self._send_json({"ok": False, "message": "Сообщение не может быть пустым."}, status=HTTPStatus.BAD_REQUEST)
                 return
             if find_user_by_id(int(user_id_raw)) is None:
                 self._send_json({"ok": False, "message": "Пользователь не найден."}, status=HTTPStatus.NOT_FOUND)
                 return
-            message = create_message(int(user_id_raw), "admin", text)
+            stored_attachment = None
+            if isinstance(attachment, dict) and attachment.get("contentBase64"):
+                try:
+                    stored_attachment = store_attachment(attachment)
+                except Exception as error:
+                    self._send_json({"ok": False, "message": str(error)}, status=HTTPStatus.BAD_REQUEST)
+                    return
+            message = create_message(int(user_id_raw), "admin", text, stored_attachment)
             self._send_json({"ok": True, "item": message}, status=HTTPStatus.CREATED)
             return
 

@@ -5,11 +5,14 @@ const adminChatSubtitle = document.querySelector("#chat-admin-subtitle");
 const adminChatMessages = document.querySelector("#admin-chat-messages");
 const adminChatForm = document.querySelector("#admin-chat-form");
 const adminChatStatus = document.querySelector("#admin-chat-status");
+const adminChatFileInput = document.querySelector("#admin-chat-file-input");
+const adminAttachmentName = document.querySelector("#admin-attachment-name");
 
 let selectedUserId = "";
 let adminChatPollTimer = null;
 let lastChatsSnapshot = [];
 const defaultTitle = document.title;
+let pendingAttachment = null;
 
 function getAdminAuth() {
   return window.localStorage.getItem("adminAuth") || "";
@@ -66,6 +69,31 @@ function renderAttachment(attachment) {
       <strong>${escapeHtml(attachment.name)}</strong>
     </a>
   `;
+}
+
+function attachmentLabel(file) {
+  if (!file) {
+    return "Файл не выбран";
+  }
+  const sizeKb = Math.max(1, Math.round(file.size / 1024));
+  return `${file.name} · ${sizeKb} КБ`;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const contentBase64 = result.includes(",") ? result.split(",")[1] : result;
+      resolve({
+        name: file.name,
+        contentType: file.type || "application/octet-stream",
+        contentBase64,
+      });
+    };
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
+    reader.readAsDataURL(file);
+  });
 }
 
 async function adminFetch(url, options = {}) {
@@ -214,6 +242,34 @@ if (refreshChatListButton) {
   });
 }
 
+adminChatFileInput?.addEventListener("change", async () => {
+  const file = adminChatFileInput.files?.[0] || null;
+  if (!file) {
+    pendingAttachment = null;
+    if (adminAttachmentName) {
+      adminAttachmentName.textContent = attachmentLabel(null);
+    }
+    return;
+  }
+  if (adminAttachmentName) {
+    adminAttachmentName.textContent = "Подготавливаю файл...";
+  }
+  try {
+    pendingAttachment = await fileToBase64(file);
+    if (adminAttachmentName) {
+      adminAttachmentName.textContent = attachmentLabel(file);
+    }
+    setStatus(adminChatStatus, "");
+  } catch (error) {
+    pendingAttachment = null;
+    adminChatFileInput.value = "";
+    if (adminAttachmentName) {
+      adminAttachmentName.textContent = attachmentLabel(null);
+    }
+    setStatus(adminChatStatus, error instanceof Error ? error.message : "Ошибка подготовки файла.", true);
+  }
+});
+
 if (adminChatForm) {
   adminChatForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -223,8 +279,8 @@ if (adminChatForm) {
     }
     const formData = new FormData(adminChatForm);
     const text = String(formData.get("text") || "").trim();
-    if (!text) {
-      setStatus(adminChatStatus, "Сообщение не может быть пустым.", true);
+    if (!text && !pendingAttachment) {
+      setStatus(adminChatStatus, "Введите сообщение или прикрепите файл.", true);
       return;
     }
     setStatus(adminChatStatus, "Отправляю ответ...");
@@ -234,9 +290,16 @@ if (adminChatForm) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({
+          text,
+          attachment: pendingAttachment,
+        }),
       });
       adminChatForm.reset();
+      pendingAttachment = null;
+      if (adminAttachmentName) {
+        adminAttachmentName.textContent = attachmentLabel(null);
+      }
       setStatus(adminChatStatus, "Ответ отправлен.");
       await loadSelectedChat();
     } catch (error) {
