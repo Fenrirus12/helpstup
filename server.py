@@ -307,7 +307,7 @@ def create_handler(app: Application):
                     return
                 record = app.reviews.save_review(payload)
                 self._send_json(
-                    {"ok": True, "message": "Отзыв отправлен и ждёт одобрения администратора.", "reviewId": record["id"]},
+                    {"ok": True, "message": "Отзыв отправлен и отобразится в течении нескольких минут.", "reviewId": record["id"]},
                     status=HTTPStatus.CREATED,
                 )
                 return
