@@ -98,6 +98,20 @@
 
           <p class="form-status" id="auth-status" aria-live="polite"></p>
         </div>
+        <div class="header-session is-hidden" id="header-session">
+          <button class="button button-secondary profile-toggle" id="profile-toggle-button" type="button" aria-expanded="false" aria-controls="profile-menu">
+            <span class="profile-avatar" id="profile-avatar" aria-hidden="true">П</span>
+            <span class="header-session-name" id="header-session-name">Пользователь</span>
+            <span class="profile-toggle-caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="profile-menu is-hidden" id="profile-menu">
+            <a class="profile-menu-link" id="open-chat-button" href="/chat">Чат</a>
+            <span class="profile-menu-divider" aria-hidden="true"></span>
+            <button class="profile-menu-link profile-menu-button" id="open-change-password-button" type="button">Сменить пароль</button>
+            <span class="profile-menu-divider" aria-hidden="true"></span>
+            <button class="profile-menu-link profile-menu-button" id="logout-button" type="button">Выйти</button>
+          </div>
+        </div>
       </div>
     </header>
 

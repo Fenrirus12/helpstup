@@ -101,6 +101,98 @@ textarea {
   margin-left: auto;
 }
 
+.header-session {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.header-session-name {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.profile-toggle {
+  min-height: 46px;
+  gap: 10px;
+  padding: 0 16px;
+}
+
+.profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #d08a61);
+  color: #fff8f3;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.profile-toggle[aria-expanded="true"] {
+  border-color: rgba(165, 75, 54, 0.35);
+  background: rgba(165, 75, 54, 0.1);
+}
+
+.profile-toggle-caret {
+  font-size: 0.9rem;
+  color: var(--muted);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.profile-toggle[aria-expanded="true"] .profile-toggle-caret {
+  transform: rotate(180deg);
+  color: var(--accent-dark);
+}
+
+.profile-menu {
+  position: absolute;
+  top: calc(100% + 14px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 220px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 249, 241, 0.98);
+  box-shadow: var(--shadow);
+}
+
+.profile-menu-divider {
+  display: block;
+  height: 1px;
+  margin: 4px 6px;
+  background: rgba(48, 29, 24, 0.08);
+}
+
+.profile-menu-link {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.profile-menu-link:hover {
+  background: rgba(165, 75, 54, 0.08);
+}
+
+.profile-menu-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
 .header-auth-open {
   min-height: 46px;
   padding: 0 18px;
@@ -1329,6 +1421,16 @@ html:not(.admin-authenticated) .admin-session {
   .header-auth {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .header-session {
+    justify-content: flex-start;
+  }
+
+  .profile-menu {
+    left: 0;
+    right: auto;
+    width: min(100%, 240px);
   }
 
   .auth-popover {

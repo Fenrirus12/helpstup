@@ -20,6 +20,13 @@ const authPopover = document.querySelector("#auth-popover");
 const openLoginButton = document.querySelector("#open-login-button");
 const openRegisterButton = document.querySelector("#open-register-button");
 const openResetButtons = document.querySelectorAll('[data-auth-tab="reset"]');
+const headerSession = document.querySelector("#header-session");
+const headerSessionName = document.querySelector("#header-session-name");
+const profileAvatar = document.querySelector("#profile-avatar");
+const profileToggleButton = document.querySelector("#profile-toggle-button");
+const profileMenu = document.querySelector("#profile-menu");
+const openChangePasswordButton = document.querySelector("#open-change-password-button");
+const logoutButton = document.querySelector("#logout-button");
 
 if (menuToggle && siteNav) {
   menuToggle.addEventListener("click", () => {
@@ -61,6 +68,67 @@ function escapeHtml(value) {
 function storeUserSession(token, user) {
   window.localStorage.setItem("userToken", token);
   window.localStorage.setItem("userProfile", JSON.stringify(user));
+}
+
+function getUserToken() {
+  return window.localStorage.getItem("userToken") || "";
+}
+
+function getStoredUserProfile() {
+  try {
+    return JSON.parse(window.localStorage.getItem("userProfile") || "null");
+  } catch (error) {
+    return null;
+  }
+}
+
+function clearUserSession() {
+  window.localStorage.removeItem("userToken");
+  window.localStorage.removeItem("userProfile");
+}
+
+function syncHeaderAuth(user) {
+  const isAuthorized = Boolean(user);
+  openLoginButton?.classList.toggle("is-hidden", isAuthorized);
+  openRegisterButton?.classList.toggle("is-hidden", isAuthorized);
+  if (isAuthorized) {
+    authPopover?.classList.add("is-hidden");
+  } else {
+    profileMenu?.classList.add("is-hidden");
+    profileToggleButton?.setAttribute("aria-expanded", "false");
+  }
+  headerSession?.classList.toggle("is-hidden", !isAuthorized);
+  if (headerSessionName) {
+    headerSessionName.textContent = user?.name || "Пользователь";
+  }
+  if (profileAvatar) {
+    const initial = (user?.name || "П").trim().charAt(0).toUpperCase() || "П";
+    profileAvatar.textContent = initial;
+  }
+}
+
+function toggleProfileMenu(forceOpen) {
+  if (!profileMenu || !profileToggleButton) {
+    return;
+  }
+  const willOpen = typeof forceOpen === "boolean" ? forceOpen : profileMenu.classList.contains("is-hidden");
+  profileMenu.classList.toggle("is-hidden", !willOpen);
+  profileToggleButton.setAttribute("aria-expanded", String(willOpen));
+}
+
+async function userFetch(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${getUserToken()}`,
+    },
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.message || "Не удалось выполнить запрос.");
+  }
+  return result;
 }
 
 function switchAuthTab(tabName) {
@@ -158,16 +226,33 @@ openLoginButton?.addEventListener("click", () => openAuthPopover("login"));
 openRegisterButton?.addEventListener("click", () => openAuthPopover("register"));
 openResetButtons.forEach((button) => button.addEventListener("click", () => openAuthPopover("reset")));
 authTabs.forEach((tab) => tab.addEventListener("click", () => switchAuthTab(tab.dataset.authTab || "login")));
+profileToggleButton?.addEventListener("click", () => toggleProfileMenu());
+openChangePasswordButton?.addEventListener("click", () => {
+  toggleProfileMenu(false);
+  openAuthPopover("reset");
+});
 
 document.addEventListener("pointerdown", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement) || !authPopover) {
     return;
   }
-  if (target.closest(".header-auth")) {
+  const insideHeaderAuth = target.closest(".header-auth");
+  if (insideHeaderAuth) {
+    const insidePopover = target.closest("#auth-popover");
+    const insideProfileMenu = target.closest("#profile-menu");
+    const insideProfileToggle = target.closest("#profile-toggle-button");
+    const insideOpenAuthButton = target.closest("#open-login-button") || target.closest("#open-register-button");
+    if (!insidePopover && !insideProfileMenu && !insideProfileToggle && !insideOpenAuthButton) {
+      authPopover.classList.add("is-hidden");
+    }
+    if (!insideProfileMenu && !insideProfileToggle) {
+      toggleProfileMenu(false);
+    }
     return;
   }
   authPopover.classList.add("is-hidden");
+  toggleProfileMenu(false);
 });
 
 loginForm?.addEventListener("submit", async (event) => {
@@ -175,6 +260,7 @@ loginForm?.addEventListener("submit", async (event) => {
   try {
     const result = await handleJsonSubmit(loginForm, "/api/auth/login", authStatus, "Выполняю вход...");
     storeUserSession(result.token, result.user);
+    syncHeaderAuth(result.user);
     window.location.href = "/chat";
   } catch (error) {
     setStatus(authStatus, error instanceof Error ? error.message : "Неверный логин или пароль.", true);
@@ -186,6 +272,7 @@ registerForm?.addEventListener("submit", async (event) => {
   try {
     const result = await handleJsonSubmit(registerForm, "/api/auth/register", authStatus, "Создаю аккаунт...");
     storeUserSession(result.token, result.user);
+    syncHeaderAuth(result.user);
     window.location.href = "/chat";
   } catch (error) {
     setStatus(authStatus, error instanceof Error ? error.message : "Ошибка регистрации.", true);
@@ -211,5 +298,39 @@ resetConfirmForm?.addEventListener("submit", async (event) => {
   }
 });
 
+logoutButton?.addEventListener("click", async () => {
+  try {
+    await userFetch("/api/auth/logout", { method: "POST" });
+  } catch (error) {
+    // Local session cleanup is enough for UI recovery.
+  } finally {
+    toggleProfileMenu(false);
+    clearUserSession();
+    syncHeaderAuth(null);
+    setStatus(authStatus, "");
+  }
+});
+
+async function restoreUserSession() {
+  const token = getUserToken();
+  if (!token) {
+    syncHeaderAuth(null);
+    return;
+  }
+  const storedUser = getStoredUserProfile();
+  if (storedUser) {
+    syncHeaderAuth(storedUser);
+  }
+  try {
+    const result = await userFetch("/api/auth/me");
+    storeUserSession(token, result.user);
+    syncHeaderAuth(result.user);
+  } catch (error) {
+    clearUserSession();
+    syncHeaderAuth(null);
+  }
+}
+
 switchAuthTab("login");
+restoreUserSession();
 loadReviews();
