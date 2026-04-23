@@ -65,28 +65,6 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function storeUserSession(token, user) {
-  window.localStorage.setItem("userToken", token);
-  window.localStorage.setItem("userProfile", JSON.stringify(user));
-}
-
-function getUserToken() {
-  return window.localStorage.getItem("userToken") || "";
-}
-
-function getStoredUserProfile() {
-  try {
-    return JSON.parse(window.localStorage.getItem("userProfile") || "null");
-  } catch (error) {
-    return null;
-  }
-}
-
-function clearUserSession() {
-  window.localStorage.removeItem("userToken");
-  window.localStorage.removeItem("userProfile");
-}
-
 function syncHeaderAuth(user) {
   const isAuthorized = Boolean(user);
   openLoginButton?.classList.toggle("is-hidden", isAuthorized);
@@ -116,17 +94,18 @@ function toggleProfileMenu(forceOpen) {
   profileToggleButton.setAttribute("aria-expanded", String(willOpen));
 }
 
-async function userFetch(url, options = {}) {
+async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
+    credentials: "same-origin",
     ...options,
     headers: {
       ...(options.headers || {}),
-      Authorization: `Bearer ${getUserToken()}`,
     },
   });
   const result = await response.json();
   if (!response.ok) {
-    throw new Error(result.message || "Не удалось выполнить запрос.");
+    const message = result.errors ? Object.values(result.errors)[0] : result.message || "Не удалось выполнить запрос.";
+    throw new Error(message);
   }
   return result;
 }
@@ -147,18 +126,13 @@ async function handleJsonSubmit(form, url, statusNode, pendingMessage) {
   const formData = new FormData(form);
   const payload = Object.fromEntries(formData.entries());
   setStatus(statusNode, pendingMessage);
-  const response = await fetch(url, {
+  const result = await fetchJson(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  const result = await response.json();
-  if (!response.ok) {
-    const message = result.errors ? Object.values(result.errors)[0] : result.message || "Не удалось отправить форму.";
-    throw new Error(message);
-  }
   form.reset();
-  setStatus(statusNode, result.message);
+  setStatus(statusNode, result.message || "");
   return result;
 }
 
@@ -183,14 +157,19 @@ function renderReviews(items) {
 
 async function loadReviews() {
   try {
-    const response = await fetch("/api/reviews");
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.message || "Не удалось загрузить отзывы.");
-    }
+    const result = await fetchJson("/api/reviews");
     renderReviews(result.items || []);
   } catch (error) {
     renderReviews([]);
+  }
+}
+
+async function restoreUserSession() {
+  try {
+    const result = await fetchJson("/api/auth/me");
+    syncHeaderAuth(result.user || null);
+  } catch (error) {
+    syncHeaderAuth(null);
   }
 }
 
@@ -259,7 +238,6 @@ loginForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     const result = await handleJsonSubmit(loginForm, "/api/auth/login", authStatus, "Выполняю вход...");
-    storeUserSession(result.token, result.user);
     syncHeaderAuth(result.user);
     window.location.href = "/chat";
   } catch (error) {
@@ -271,7 +249,6 @@ registerForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     const result = await handleJsonSubmit(registerForm, "/api/auth/register", authStatus, "Создаю аккаунт...");
-    storeUserSession(result.token, result.user);
     syncHeaderAuth(result.user);
     window.location.href = "/chat";
   } catch (error) {
@@ -300,36 +277,15 @@ resetConfirmForm?.addEventListener("submit", async (event) => {
 
 logoutButton?.addEventListener("click", async () => {
   try {
-    await userFetch("/api/auth/logout", { method: "POST" });
+    await fetchJson("/api/auth/logout", { method: "POST" });
   } catch (error) {
-    // Local session cleanup is enough for UI recovery.
+    // UI can still recover even if logout request fails.
   } finally {
     toggleProfileMenu(false);
-    clearUserSession();
     syncHeaderAuth(null);
     setStatus(authStatus, "");
   }
 });
-
-async function restoreUserSession() {
-  const token = getUserToken();
-  if (!token) {
-    syncHeaderAuth(null);
-    return;
-  }
-  const storedUser = getStoredUserProfile();
-  if (storedUser) {
-    syncHeaderAuth(storedUser);
-  }
-  try {
-    const result = await userFetch("/api/auth/me");
-    storeUserSession(token, result.user);
-    syncHeaderAuth(result.user);
-  } catch (error) {
-    clearUserSession();
-    syncHeaderAuth(null);
-  }
-}
 
 switchAuthTab("login");
 restoreUserSession();

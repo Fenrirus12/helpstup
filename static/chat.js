@@ -9,15 +9,6 @@ const attachmentName = document.querySelector("#attachment-name");
 let chatPollTimer = null;
 let pendingAttachment = null;
 
-function getUserToken() {
-  return window.localStorage.getItem("userToken") || "";
-}
-
-function clearUserSession() {
-  window.localStorage.removeItem("userToken");
-  window.localStorage.removeItem("userProfile");
-}
-
 function setStatus(node, message, isError = false) {
   if (!node) {
     return;
@@ -66,13 +57,12 @@ function renderAttachment(attachment) {
   `;
 }
 
-async function userFetch(url, options = {}) {
-  const token = getUserToken();
+async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
+    credentials: "same-origin",
     ...options,
     headers: {
       ...(options.headers || {}),
-      Authorization: `Bearer ${token}`,
     },
   });
   const result = await response.json();
@@ -103,25 +93,23 @@ function renderMessages(items) {
   userChatMessages.scrollTop = userChatMessages.scrollHeight;
 }
 
-async function loadProfile() {
+async function ensureAuthorizedUser() {
   try {
-    const result = await userFetch("/api/auth/me");
+    const result = await fetchJson("/api/auth/me");
     if (userName) {
       userName.textContent = result.user?.name || "Пользователь";
     }
   } catch (error) {
-    clearUserSession();
     window.location.replace("/");
   }
 }
 
 async function loadMessages() {
   try {
-    const result = await userFetch("/api/chat/messages");
+    const result = await fetchJson("/api/chat/messages");
     renderMessages(result.items || []);
   } catch (error) {
     if (error instanceof Error && (error.message.includes("авториза") || error.message.includes("Сессия"))) {
-      clearUserSession();
       window.location.replace("/");
       return;
     }
@@ -156,10 +144,6 @@ function fileToBase64(file) {
     reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
     reader.readAsDataURL(file);
   });
-}
-
-if (!getUserToken()) {
-  window.location.replace("/");
 }
 
 chatFileInput?.addEventListener("change", async () => {
@@ -200,7 +184,7 @@ userChatForm?.addEventListener("submit", async (event) => {
   }
   setStatus(chatStatus, "Отправляю сообщение...");
   try {
-    await userFetch("/api/chat/messages", {
+    await fetchJson("/api/chat/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -224,16 +208,15 @@ userChatForm?.addEventListener("submit", async (event) => {
 
 userLogoutButton?.addEventListener("click", async () => {
   try {
-    await userFetch("/api/auth/logout", { method: "POST" });
+    await fetchJson("/api/auth/logout", { method: "POST" });
   } catch (error) {
-    // Session cleanup is local-first; ignore network failure here.
+    // Ignore and continue with redirect.
   } finally {
-    clearUserSession();
     stopPolling();
     window.location.replace("/");
   }
 });
 
-loadProfile();
+ensureAuthorizedUser();
 loadMessages();
 startPolling();
