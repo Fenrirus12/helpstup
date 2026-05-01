@@ -221,7 +221,7 @@ async function restoreUserSession() {
 
 function attachmentLabel(file) {
   if (!file) {
-    return "Файл не выбран";
+    return "Файл для администратора не выбран";
   }
   const sizeKb = Math.max(1, Math.round(file.size / 1024));
   return `${file.name} · ${sizeKb} КБ`;
