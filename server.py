@@ -367,6 +367,13 @@ def create_handler(app: Application):
                 if errors:
                     self._send_json({"ok": False, "errors": errors}, status=HTTPStatus.BAD_REQUEST)
                     return
+                attachment_payload = payload.pop("attachment", None)
+                if isinstance(attachment_payload, dict) and attachment_payload.get("contentBase64"):
+                    try:
+                        payload["attachment"] = app.chat.store_attachment(attachment_payload)
+                    except Exception as error:
+                        self._send_json({"ok": False, "message": str(error)}, status=HTTPStatus.BAD_REQUEST)
+                        return
                 record = app.reviews.save_work(payload)
                 self._send_json({"ok": True, "message": f"Работа #{record['id']} добавлена.", "item": record}, status=HTTPStatus.CREATED)
                 return
@@ -441,6 +448,13 @@ def create_handler(app: Application):
                 if errors:
                     self._send_json({"ok": False, "errors": errors}, status=HTTPStatus.BAD_REQUEST)
                     return
+                attachment_payload = payload.pop("attachment", None)
+                if isinstance(attachment_payload, dict) and attachment_payload.get("contentBase64"):
+                    try:
+                        payload["attachment"] = app.chat.store_attachment(attachment_payload)
+                    except Exception as error:
+                        self._send_json({"ok": False, "message": str(error)}, status=HTTPStatus.BAD_REQUEST)
+                        return
                 updated = app.reviews.update_work(int(work_id_raw), payload)
                 if updated is None:
                     self._send_json({"ok": False, "message": "Работа не найдена."}, status=HTTPStatus.NOT_FOUND)

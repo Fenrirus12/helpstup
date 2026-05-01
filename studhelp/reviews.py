@@ -180,6 +180,8 @@ class ReviewService:
             "description": str(payload.get("description", "")).strip(),
             "tags": str(payload.get("tags", "")).strip(),
         }
+        if isinstance(payload.get("attachment"), dict):
+            record["attachment"] = payload["attachment"]
         entries.append(record)
         self.storage.write_works(entries)
         return record
@@ -197,6 +199,8 @@ class ReviewService:
             item["description"] = str(payload.get("description", "")).strip()
             item["tags"] = str(payload.get("tags", "")).strip()
             item["published"] = bool(payload.get("published", True))
+            if isinstance(payload.get("attachment"), dict):
+                item["attachment"] = payload["attachment"]
             item["updatedAt"] = datetime.now(timezone.utc).isoformat()
             updated = item
             break

@@ -181,6 +181,12 @@ function renderWorks(items) {
           ${item.originality ? `<span>${escapeHtml(item.originality)}</span>` : ""}
           ${item.tags ? `<span>${escapeHtml(item.tags)}</span>` : ""}
         </div>
+        ${item.attachment?.path ? `
+          <a class="chat-attachment work-download-link" href="${escapeHtml(item.attachment.path)}" target="_blank" rel="noopener noreferrer">
+            <span>Файл</span>
+            <strong>${escapeHtml(item.attachment.name)}</strong>
+          </a>
+        ` : ""}
       </article>
     `).join("")
     : `

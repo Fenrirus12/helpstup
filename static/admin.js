@@ -10,6 +10,8 @@ const reviewsEmptyNode = document.querySelector("#reviews-empty");
 const workAdminForm = document.querySelector("#work-admin-form");
 const workAdminList = document.querySelector("#work-admin-list");
 const worksEmptyNode = document.querySelector("#works-empty");
+const workFileInput = document.querySelector("#work-file-input");
+const workAttachmentName = document.querySelector("#work-attachment-name");
 const logoutButton = document.querySelector("#logout-button");
 const changeUserButton = document.querySelector("#change-user-button");
 const refreshButton = document.querySelector("#refresh-button");
@@ -20,6 +22,7 @@ const resetWorkFormButton = document.querySelector("#reset-work-form-button");
 const taskTypeFilter = document.querySelector("#task-type-filter");
 const reviewStatusFilter = document.querySelector("#review-status-filter");
 const counterNode = document.querySelector("#admin-counter");
+let pendingWorkAttachment = null;
 
 function setAdminStatus(message, isError = false) {
   if (!statusNode) {
@@ -256,6 +259,12 @@ function renderAdminWorks(items) {
       <div class="request-details">
         <span>Описание</span>
         <p>${escapeHtml(item.description).replaceAll("\n", "<br>")}</p>
+        ${item.attachment?.path ? `
+          <a class="chat-attachment" href="${escapeHtml(item.attachment.path)}" target="_blank" rel="noopener noreferrer">
+            <span>Файл работы</span>
+            <strong>${escapeHtml(item.attachment.name)}</strong>
+          </a>
+        ` : ""}
       </div>
       <div class="admin-actions review-actions">
         <button class="button button-secondary work-edit" type="button" data-work-id="${escapeHtml(item.id)}">Редактировать</button>
@@ -420,7 +429,7 @@ function getWorkPayload() {
     return {};
   }
   const formData = new FormData(workAdminForm);
-  return {
+  const payload = {
     title: String(formData.get("title") || "").trim(),
     workType: String(formData.get("workType") || "").trim(),
     subject: String(formData.get("subject") || "").trim(),
@@ -429,6 +438,35 @@ function getWorkPayload() {
     description: String(formData.get("description") || "").trim(),
     published: Boolean(formData.get("published")),
   };
+  if (pendingWorkAttachment) {
+    payload.attachment = pendingWorkAttachment;
+  }
+  return payload;
+}
+
+function attachmentLabel(file) {
+  if (!file) {
+    return "Файл не выбран";
+  }
+  const sizeKb = Math.max(1, Math.round(file.size / 1024));
+  return `${file.name} · ${sizeKb} КБ`;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const contentBase64 = result.includes(",") ? result.split(",")[1] : result;
+      resolve({
+        name: file.name,
+        contentType: file.type || "application/octet-stream",
+        contentBase64,
+      });
+    };
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
+    reader.readAsDataURL(file);
+  });
 }
 
 function resetWorkForm() {
@@ -436,6 +474,13 @@ function resetWorkForm() {
     return;
   }
   workAdminForm.reset();
+  pendingWorkAttachment = null;
+  if (workFileInput instanceof HTMLInputElement) {
+    workFileInput.value = "";
+  }
+  if (workAttachmentName) {
+    workAttachmentName.textContent = attachmentLabel(null);
+  }
   const idInput = workAdminForm.querySelector('input[name="id"]');
   if (idInput instanceof HTMLInputElement) {
     idInput.value = "";
@@ -460,6 +505,15 @@ function fillWorkForm(item) {
   const publishedInput = workAdminForm.querySelector('input[name="published"]');
   if (publishedInput instanceof HTMLInputElement) {
     publishedInput.checked = Boolean(item.published);
+  }
+  pendingWorkAttachment = null;
+  if (workFileInput instanceof HTMLInputElement) {
+    workFileInput.value = "";
+  }
+  if (workAttachmentName) {
+    workAttachmentName.textContent = item.attachment?.name
+      ? `Текущий файл: ${item.attachment.name}. Новый файл заменит его.`
+      : attachmentLabel(null);
   }
   workAdminForm.scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -581,6 +635,34 @@ if (resetWorkFormButton) {
     resetWorkForm();
   });
 }
+
+workFileInput?.addEventListener("change", async () => {
+  const file = workFileInput.files?.[0] || null;
+  if (!file) {
+    pendingWorkAttachment = null;
+    if (workAttachmentName) {
+      workAttachmentName.textContent = attachmentLabel(null);
+    }
+    return;
+  }
+  if (workAttachmentName) {
+    workAttachmentName.textContent = "Подготавливаю файл...";
+  }
+  try {
+    pendingWorkAttachment = await fileToBase64(file);
+    if (workAttachmentName) {
+      workAttachmentName.textContent = attachmentLabel(file);
+    }
+    setAdminStatus("");
+  } catch (error) {
+    pendingWorkAttachment = null;
+    workFileInput.value = "";
+    if (workAttachmentName) {
+      workAttachmentName.textContent = attachmentLabel(null);
+    }
+    setAdminStatus(error instanceof Error ? error.message : "Ошибка подготовки файла.", true);
+  }
+});
 
 if (workAdminForm) {
   workAdminForm.addEventListener("submit", (event) => {
