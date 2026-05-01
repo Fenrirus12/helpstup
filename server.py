@@ -34,7 +34,7 @@ class Application:
 
 def create_handler(app: Application):
     class AppHandler(BaseHTTPRequestHandler):
-        server_version = "ProsePrincessClone/2.0"
+        server_version = "HelpStudent/2.0"
 
         def do_GET(self) -> None:
             self._response_sent = False
@@ -59,6 +59,10 @@ def create_handler(app: Application):
 
             if parsed.path == "/api/reviews":
                 self._send_json({"ok": True, "items": app.reviews.public_reviews()})
+                return
+
+            if parsed.path == "/api/works":
+                self._send_json({"ok": True, "items": app.reviews.public_works()})
                 return
 
             if parsed.path == "/api/auth/me":
@@ -108,6 +112,15 @@ def create_handler(app: Application):
                 status = params.get("status", [""])[0].strip()
                 items = app.reviews.filter_reviews(query, status)
                 self._send_json({"ok": True, "items": items})
+                return
+
+            if parsed.path == "/api/admin/works":
+                self._require_admin()
+                if self._response_sent:
+                    return
+                params = parse_qs(parsed.query)
+                query = params.get("q", [""])[0].strip()
+                self._send_json({"ok": True, "items": app.reviews.filter_works(query)})
                 return
 
             self._serve_static(parsed.path)
@@ -290,10 +303,33 @@ def create_handler(app: Application):
                 if errors:
                     self._send_json({"ok": False, "errors": errors}, status=HTTPStatus.BAD_REQUEST)
                     return
+                auth_result = self._resolve_request_user(payload)
+                if auth_result is None:
+                    return
+                user, token = auth_result
+                attachment_payload = payload.pop("attachment", None)
+                attachment = None
+                if isinstance(attachment_payload, dict) and attachment_payload.get("contentBase64"):
+                    try:
+                        attachment = app.chat.store_attachment(attachment_payload)
+                    except Exception as error:
+                        self._send_json({"ok": False, "message": str(error)}, status=HTTPStatus.BAD_REQUEST)
+                        return
+                payload["userId"] = user["id"]
+                if attachment:
+                    payload["attachment"] = attachment
                 record = app.reviews.save_request(payload)
+                app.storage.create_message(int(user["id"]), "user", self._format_request_message(record), attachment)
+                headers = {"Set-Cookie": self._build_session_cookie(token)} if token else None
                 self._send_json(
-                    {"ok": True, "message": "Заявка отправлена. Я свяжусь с вами в ближайшее время.", "requestId": record["id"]},
+                    {
+                        "ok": True,
+                        "message": "Заявка отправлена. Дальнейший диалог будет идти в чате с администратором.",
+                        "requestId": record["id"],
+                        "redirectTo": "/chat",
+                    },
                     status=HTTPStatus.CREATED,
+                    headers=headers,
                 )
                 return
 
@@ -320,11 +356,41 @@ def create_handler(app: Application):
                 self._change_review_status(parsed.path, "rejected")
                 return
 
+            if parsed.path == "/api/admin/works":
+                self._require_admin()
+                if self._response_sent:
+                    return
+                payload = self._read_json_body()
+                if payload is None:
+                    return
+                errors = self._validate_work(payload)
+                if errors:
+                    self._send_json({"ok": False, "errors": errors}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                record = app.reviews.save_work(payload)
+                self._send_json({"ok": True, "message": f"Работа #{record['id']} добавлена.", "item": record}, status=HTTPStatus.CREATED)
+                return
+
             self.send_error(HTTPStatus.NOT_FOUND, "Endpoint not found")
 
         def do_DELETE(self) -> None:
             self._response_sent = False
             parsed = urlparse(self.path)
+            if parsed.path.startswith("/api/admin/works/"):
+                self._require_admin()
+                if self._response_sent:
+                    return
+                work_id_raw = parsed.path.removeprefix("/api/admin/works/").strip("/")
+                if not work_id_raw.isdigit():
+                    self._send_json({"ok": False, "message": "Некорректный идентификатор работы."}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                deleted = app.reviews.delete_work(int(work_id_raw))
+                if deleted is None:
+                    self._send_json({"ok": False, "message": "Работа не найдена."}, status=HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json({"ok": True, "message": f"Работа #{work_id_raw} удалена."})
+                return
+
             if parsed.path.startswith("/api/admin/reviews/"):
                 self._require_admin()
                 if self._response_sent:
@@ -360,6 +426,28 @@ def create_handler(app: Application):
         def do_PUT(self) -> None:
             self._response_sent = False
             parsed = urlparse(self.path)
+            if parsed.path.startswith("/api/admin/works/"):
+                self._require_admin()
+                if self._response_sent:
+                    return
+                work_id_raw = parsed.path.removeprefix("/api/admin/works/").strip("/")
+                if not work_id_raw.isdigit():
+                    self._send_json({"ok": False, "message": "Некорректный идентификатор работы."}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                payload = self._read_json_body()
+                if payload is None:
+                    return
+                errors = self._validate_work(payload)
+                if errors:
+                    self._send_json({"ok": False, "errors": errors}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                updated = app.reviews.update_work(int(work_id_raw), payload)
+                if updated is None:
+                    self._send_json({"ok": False, "message": "Работа не найдена."}, status=HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json({"ok": True, "message": f"Работа #{work_id_raw} сохранена.", "item": updated})
+                return
+
             if not parsed.path.startswith("/api/admin/reviews/"):
                 self.send_error(HTTPStatus.NOT_FOUND, "Endpoint not found")
                 return
@@ -479,6 +567,48 @@ def create_handler(app: Application):
             verb = "одобрен" if status == "approved" else "отклонён"
             self._send_json({"ok": True, "message": f"Отзыв #{review_id_raw} {verb}."})
 
+        def _resolve_request_user(self, payload: dict) -> tuple[dict, str] | None:
+            current_user = app.auth.get_user_by_session(self._get_session_token())
+            if current_user is not None:
+                return current_user, ""
+            auth_payload = {
+                "name": str(payload.get("name", "")).strip(),
+                "email": str(payload.get("authEmail", "")).strip().lower(),
+                "password": str(payload.get("authPassword", "")),
+            }
+            errors = validate_user_auth(auth_payload, with_name=True)
+            if errors:
+                self._send_json(
+                    {"ok": False, "errors": errors, "message": "Для отправки заявки нужно создать аккаунт или войти."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return None
+            existing_user = app.storage.get_user_by_email(auth_payload["email"])
+            if existing_user is None:
+                return app.auth.register(auth_payload)
+            login_result = app.auth.login(auth_payload)
+            if login_result is None:
+                self._send_json(
+                    {"ok": False, "message": "Почта уже зарегистрирована. Введите пароль от аккаунта или используйте другую почту."},
+                    status=HTTPStatus.CONFLICT,
+                )
+                return None
+            return login_result
+
+        def _format_request_message(self, record: dict) -> str:
+            lines = [
+                f"Новая заявка #{record.get('id')}",
+                f"Имя: {record.get('name', '')}",
+                f"Контакт: {record.get('contact', '')}",
+                f"Тип работы: {record.get('taskType', '')}",
+                f"Антиплагиат: {record.get('antiPlagiarism', '')}",
+                f"Дедлайн: {record.get('deadline', '')}",
+                "",
+                "Описание:",
+                str(record.get("details", "")),
+            ]
+            return "\n".join(lines).strip()
+
         def _serve_static(self, raw_path: str) -> None:
             routes = {
                 "/": "/index.html",
@@ -538,6 +668,7 @@ def create_handler(app: Application):
                 "name": "Укажите имя.",
                 "contact": "Укажите способ связи.",
                 "taskType": "Выберите тип работы.",
+                "antiPlagiarism": "Выберите тип антиплагиата.",
                 "deadline": "Укажите срок.",
                 "details": "Опишите задачу.",
             }
@@ -549,6 +680,23 @@ def create_handler(app: Application):
             details = str(payload.get("details", ""))
             if details and len(details.strip()) < 20:
                 errors["details"] = "Опишите задачу чуть подробнее, минимум 20 символов."
+            return errors
+
+        def _validate_work(self, payload: dict) -> dict[str, str]:
+            required_fields = {
+                "title": "Укажите название работы.",
+                "workType": "Укажите тип работы.",
+                "subject": "Укажите предмет или направление.",
+                "description": "Добавьте краткое описание.",
+            }
+            errors: dict[str, str] = {}
+            for field, message in required_fields.items():
+                value = payload.get(field, "")
+                if not isinstance(value, str) or not value.strip():
+                    errors[field] = message
+            description = str(payload.get("description", ""))
+            if description and len(description.strip()) < 20:
+                errors["description"] = "Описание должно быть подробнее, минимум 20 символов."
             return errors
 
         def _validate_review(self, payload: dict) -> dict[str, str]:

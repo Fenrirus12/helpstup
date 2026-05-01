@@ -4,9 +4,13 @@ const navLinks = document.querySelectorAll(".site-nav a");
 const faqItems = document.querySelectorAll(".faq-item");
 const requestForm = document.querySelector("#request-form");
 const requestStatusBox = document.querySelector("#form-status");
+const requestAuthBox = document.querySelector("#request-auth-box");
+const requestFileInput = document.querySelector("#request-file-input");
+const requestAttachmentName = document.querySelector("#request-attachment-name");
 const reviewForm = document.querySelector("#review-form");
 const reviewStatusBox = document.querySelector("#review-status");
 const reviewsList = document.querySelector("#reviews-list");
+const worksList = document.querySelector("#works-list");
 const footerCopyButton = document.querySelector(".footer-copy-button");
 const footerCopyStatus = document.querySelector("#footer-copy-status");
 const loginForm = document.querySelector("#login-form");
@@ -27,6 +31,8 @@ const profileToggleButton = document.querySelector("#profile-toggle-button");
 const profileMenu = document.querySelector("#profile-menu");
 const openChangePasswordButton = document.querySelector("#open-change-password-button");
 const logoutButton = document.querySelector("#logout-button");
+let currentUser = null;
+let pendingRequestAttachment = null;
 
 if (menuToggle && siteNav) {
   menuToggle.addEventListener("click", () => {
@@ -67,6 +73,7 @@ function escapeHtml(value) {
 
 function syncHeaderAuth(user) {
   const isAuthorized = Boolean(user);
+  currentUser = user || null;
   openLoginButton?.classList.toggle("is-hidden", isAuthorized);
   openRegisterButton?.classList.toggle("is-hidden", isAuthorized);
   if (isAuthorized) {
@@ -76,6 +83,10 @@ function syncHeaderAuth(user) {
     profileToggleButton?.setAttribute("aria-expanded", "false");
   }
   headerSession?.classList.toggle("is-hidden", !isAuthorized);
+  requestAuthBox?.classList.toggle("is-hidden", isAuthorized);
+  requestAuthBox?.querySelectorAll("input").forEach((input) => {
+    input.required = !isAuthorized;
+  });
   if (headerSessionName) {
     headerSessionName.textContent = user?.name || "Пользователь";
   }
@@ -155,6 +166,41 @@ function renderReviews(items) {
     `;
 }
 
+function renderWorks(items) {
+  if (!worksList) {
+    return;
+  }
+  worksList.innerHTML = items.length
+    ? items.map((item) => `
+      <article class="portfolio-card">
+        <p class="portfolio-type">${escapeHtml(item.workType || "Работа")}</p>
+        <h3>${escapeHtml(item.title)}</h3>
+        <p>${escapeHtml(item.description)}</p>
+        <div class="work-meta">
+          <span>${escapeHtml(item.subject)}</span>
+          ${item.originality ? `<span>${escapeHtml(item.originality)}</span>` : ""}
+          ${item.tags ? `<span>${escapeHtml(item.tags)}</span>` : ""}
+        </div>
+      </article>
+    `).join("")
+    : `
+      <article class="portfolio-card">
+        <p class="portfolio-type">Работы</p>
+        <h3>Каталог пополняется</h3>
+        <p>Администратор скоро добавит примеры работ, которые можно будет просмотреть перед заявкой.</p>
+      </article>
+    `;
+}
+
+async function loadWorks() {
+  try {
+    const result = await fetchJson("/api/works");
+    renderWorks(result.items || []);
+  } catch (error) {
+    renderWorks([]);
+  }
+}
+
 async function loadReviews() {
   try {
     const result = await fetchJson("/api/reviews");
@@ -173,10 +219,83 @@ async function restoreUserSession() {
   }
 }
 
+function attachmentLabel(file) {
+  if (!file) {
+    return "Файл не выбран";
+  }
+  const sizeKb = Math.max(1, Math.round(file.size / 1024));
+  return `${file.name} · ${sizeKb} КБ`;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const contentBase64 = result.includes(",") ? result.split(",")[1] : result;
+      resolve({
+        name: file.name,
+        contentType: file.type || "application/octet-stream",
+        contentBase64,
+      });
+    };
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл."));
+    reader.readAsDataURL(file);
+  });
+}
+
+requestFileInput?.addEventListener("change", async () => {
+  const file = requestFileInput.files?.[0] || null;
+  if (!file) {
+    pendingRequestAttachment = null;
+    if (requestAttachmentName) {
+      requestAttachmentName.textContent = attachmentLabel(null);
+    }
+    return;
+  }
+  if (requestAttachmentName) {
+    requestAttachmentName.textContent = "Подготавливаю файл...";
+  }
+  try {
+    pendingRequestAttachment = await fileToBase64(file);
+    if (requestAttachmentName) {
+      requestAttachmentName.textContent = attachmentLabel(file);
+    }
+    setStatus(requestStatusBox, "");
+  } catch (error) {
+    pendingRequestAttachment = null;
+    requestFileInput.value = "";
+    if (requestAttachmentName) {
+      requestAttachmentName.textContent = attachmentLabel(null);
+    }
+    setStatus(requestStatusBox, error instanceof Error ? error.message : "Ошибка подготовки файла.", true);
+  }
+});
+
 requestForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
-    await handleJsonSubmit(requestForm, "/api/requests", requestStatusBox, "Отправляю заявку...");
+    const formData = new FormData(requestForm);
+    const payload = Object.fromEntries(formData.entries());
+    delete payload.attachmentFile;
+    if (pendingRequestAttachment) {
+      payload.attachment = pendingRequestAttachment;
+    }
+    setStatus(requestStatusBox, currentUser ? "Отправляю заявку в чат..." : "Создаю аккаунт и отправляю заявку в чат...");
+    const result = await fetchJson("/api/requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    requestForm.reset();
+    pendingRequestAttachment = null;
+    if (requestAttachmentName) {
+      requestAttachmentName.textContent = attachmentLabel(null);
+    }
+    setStatus(requestStatusBox, result.message || "Заявка отправлена.");
+    window.setTimeout(() => {
+      window.location.href = result.redirectTo || "/chat";
+    }, 700);
   } catch (error) {
     setStatus(requestStatusBox, error instanceof Error ? error.message : "Ошибка соединения.", true);
   }
@@ -290,3 +409,4 @@ logoutButton?.addEventListener("click", async () => {
 switchAuthTab("login");
 restoreUserSession();
 loadReviews();
+loadWorks();

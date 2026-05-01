@@ -44,6 +44,15 @@ def matches_review_filters(item: dict, query: str, status: str) -> bool:
     return True
 
 
+def matches_work_filters(item: dict, query: str) -> bool:
+    if not query:
+        return True
+    haystack = " ".join(
+        str(item.get(field, "")) for field in ("title", "workType", "subject", "description", "tags")
+    ).lower()
+    return query.lower() in haystack
+
+
 class ReviewService:
     def __init__(self, storage: Storage) -> None:
         self.storage = storage
@@ -146,4 +155,66 @@ class ReviewService:
         if deleted is None:
             return None
         self.storage.write_reviews(remaining)
+        return deleted
+
+    def public_works(self) -> list[dict]:
+        return [item for item in reversed(self.storage.load_works()) if bool(item.get("published", True))]
+
+    def filter_works(self, query: str = "") -> list[dict]:
+        return [
+            item
+            for item in reversed(self.storage.load_works())
+            if matches_work_filters(item, query)
+        ]
+
+    def save_work(self, payload: dict) -> dict:
+        entries = self.storage.load_works()
+        record = {
+            "id": self.storage.next_json_id(entries),
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "published": bool(payload.get("published", True)),
+            "title": str(payload.get("title", "")).strip(),
+            "workType": str(payload.get("workType", "")).strip(),
+            "subject": str(payload.get("subject", "")).strip(),
+            "originality": str(payload.get("originality", "")).strip(),
+            "description": str(payload.get("description", "")).strip(),
+            "tags": str(payload.get("tags", "")).strip(),
+        }
+        entries.append(record)
+        self.storage.write_works(entries)
+        return record
+
+    def update_work(self, work_id: int, payload: dict) -> dict | None:
+        entries = self.storage.load_works()
+        updated: dict | None = None
+        for item in entries:
+            if int(item.get("id", 0)) != work_id:
+                continue
+            item["title"] = str(payload.get("title", "")).strip()
+            item["workType"] = str(payload.get("workType", "")).strip()
+            item["subject"] = str(payload.get("subject", "")).strip()
+            item["originality"] = str(payload.get("originality", "")).strip()
+            item["description"] = str(payload.get("description", "")).strip()
+            item["tags"] = str(payload.get("tags", "")).strip()
+            item["published"] = bool(payload.get("published", True))
+            item["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            updated = item
+            break
+        if updated is None:
+            return None
+        self.storage.write_works(entries)
+        return updated
+
+    def delete_work(self, work_id: int) -> dict | None:
+        entries = self.storage.load_works()
+        remaining: list[dict] = []
+        deleted: dict | None = None
+        for item in entries:
+            if int(item.get("id", 0)) == work_id and deleted is None:
+                deleted = item
+                continue
+            remaining.append(item)
+        if deleted is None:
+            return None
+        self.storage.write_works(remaining)
         return deleted

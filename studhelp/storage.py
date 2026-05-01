@@ -30,6 +30,7 @@ class Storage:
         for file_path, default in (
             (self.settings.data_dir / "requests.json", "[]"),
             (self.settings.data_dir / "reviews.json", "[]"),
+            (self.settings.data_dir / "works.json", "[]"),
             (self.settings.data_dir / "users.json", "[]"),
             (self.settings.data_dir / "sessions.json", "[]"),
             (self.settings.data_dir / "messages.json", "[]"),
@@ -225,6 +226,12 @@ class Storage:
 
     def write_reviews(self, entries: list[dict]) -> None:
         self._write_json_list(self.settings.data_dir / "reviews.json", entries)
+
+    def load_works(self) -> list[dict]:
+        return self._load_json_list(self.settings.data_dir / "works.json")
+
+    def write_works(self, entries: list[dict]) -> None:
+        self._write_json_list(self.settings.data_dir / "works.json", entries)
 
     def next_json_id(self, entries: list[dict]) -> int:
         return max((int(item.get("id", 0)) for item in entries), default=0) + 1

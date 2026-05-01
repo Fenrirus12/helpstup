@@ -430,7 +430,8 @@ h2 {
 .service-grid,
 .process-grid,
 .portfolio-grid,
-.review-grid {
+.review-grid,
+.why-grid {
   display: grid;
   gap: 18px;
 }
@@ -441,9 +442,38 @@ h2 {
 
 .service-card,
 .portfolio-card,
-.review-card {
+.review-card,
+.why-card {
   padding: 24px;
   border-radius: 26px;
+}
+
+.why-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.why-card {
+  border: 1px solid var(--line);
+  background: rgba(255, 250, 245, 0.72);
+  box-shadow: var(--shadow);
+}
+
+.why-card span {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 18px;
+  border-radius: 14px;
+  background: rgba(165, 75, 54, 0.12);
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+.why-card p,
+.work-meta {
+  color: var(--muted);
+  line-height: 1.7;
 }
 
 .service-card h3,
@@ -481,6 +511,22 @@ h2 {
 .portfolio-grid,
 .review-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.work-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.work-meta span {
+  padding: 7px 10px;
+  border: 1px solid rgba(48, 29, 24, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 252, 248, 0.72);
+  font-size: 0.84rem;
+  font-weight: 700;
 }
 
 .reviews-layout {
@@ -800,7 +846,7 @@ h2 {
 }
 
 .faq-item.is-open .faq-answer {
-  max-height: 180px;
+  max-height: 240px;
   padding-bottom: 20px;
 }
 
@@ -820,6 +866,27 @@ h2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.request-auth-box {
+  display: grid;
+  grid-template-columns: 1fr repeat(2, minmax(180px, 0.7fr));
+  gap: 16px;
+  align-items: end;
+  padding: 18px;
+  border: 1px solid rgba(165, 75, 54, 0.18);
+  border-radius: 22px;
+  background: rgba(255, 252, 248, 0.72);
+}
+
+.request-auth-box h3 {
+  margin-bottom: 8px;
+}
+
+.request-auth-box p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .contact-form label {
@@ -891,8 +958,13 @@ h2 {
   align-items: start;
   justify-content: space-between;
   gap: 32px;
-  padding: 28px 0 0;
-  border-top: 1px solid rgba(48, 29, 24, 0.14);
+  padding: 28px;
+  border: 1px solid rgba(48, 29, 24, 0.1);
+  border-radius: 30px;
+  background:
+    linear-gradient(135deg, rgba(255, 252, 248, 0.92), rgba(240, 228, 210, 0.72)),
+    var(--paper);
+  box-shadow: var(--shadow);
 }
 
 .footer-copy h2 {
@@ -908,6 +980,10 @@ h2 {
 .footer-contact-item {
   display: grid;
   gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid rgba(48, 29, 24, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 252, 248, 0.72);
 }
 
 .footer-contact-label,
@@ -1226,6 +1302,56 @@ html:not(.admin-authenticated) .admin-session {
   gap: 18px;
 }
 
+.work-admin-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 22px;
+  border: 1px solid rgba(48, 29, 24, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 252, 248, 0.72);
+}
+
+.work-admin-form label {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.work-admin-form input,
+.work-admin-form textarea {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(48, 29, 24, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 251, 246, 0.88);
+  color: var(--text);
+}
+
+.work-admin-form textarea {
+  min-height: 130px;
+  resize: vertical;
+}
+
+.work-published-toggle {
+  display: inline-flex !important;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  align-self: center;
+  gap: 10px;
+}
+
+.work-published-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.work-admin-list {
+  display: grid;
+  gap: 18px;
+}
+
 .reviews-admin-head {
   margin-top: 32px;
 }
@@ -1365,7 +1491,10 @@ html:not(.admin-authenticated) .admin-session {
   .service-grid,
   .process-grid,
   .portfolio-grid,
-  .review-grid {
+  .review-grid,
+  .why-grid,
+  .request-auth-box,
+  .work-admin-form {
     grid-template-columns: 1fr;
   }
 

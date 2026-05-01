@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Админ-панель заявок и отзывов | Prose Atelier</title>
-  <meta name="description" content="Админ-панель Prose Atelier для просмотра заявок, фильтрации обращений и модерации отзывов.">
+  <title>Админ-панель заявок и отзывов | Help-student</title>
+  <meta name="description" content="Админ-панель Help-student для просмотра заявок, фильтрации обращений, работ и модерации отзывов.">
   <script>
     (function () {
       try {
@@ -25,8 +25,8 @@
   <div class="page-shell admin-shell">
     <header class="site-header">
       <a class="brand" href="/">
-        <span class="brand-mark">PA</span>
-        <span class="brand-text">Prose Atelier</span>
+        <span class="brand-mark">HS</span>
+        <span class="brand-text">Help-student</span>
       </a>
       <nav class="site-nav admin-nav is-open">
         <a href="/">На сайт</a>
@@ -122,6 +122,54 @@
           </div>
           <div class="admin-empty" id="admin-empty">Войдите, чтобы увидеть заявки.</div>
           <div class="request-list" id="request-list"></div>
+
+          <div class="admin-panel-head admin-panel-head-wrap reviews-admin-head">
+            <div>
+              <p class="eyebrow">Работы на сайте</p>
+              <h2>Размещение работ</h2>
+              <p class="admin-panel-subtitle">Добавляйте примеры работ, которые студент увидит в блоке «Работы» на главной странице.</p>
+            </div>
+            <div class="admin-actions">
+              <button class="button button-secondary" id="refresh-works-button" type="button">Обновить работы</button>
+            </div>
+          </div>
+          <form class="work-admin-form" id="work-admin-form">
+            <input type="hidden" name="id">
+            <label>
+              Название
+              <input type="text" name="title" placeholder="Например: Управление персоналом в малом бизнесе" required>
+            </label>
+            <label>
+              Тип работы
+              <input type="text" name="workType" placeholder="Курсовая, ВКР, реферат" required>
+            </label>
+            <label>
+              Предмет
+              <input type="text" name="subject" placeholder="Менеджмент, право, экономика" required>
+            </label>
+            <label>
+              Оригинальность
+              <input type="text" name="originality" placeholder="Например: 78% Антиплагиат.ВУЗ">
+            </label>
+            <label class="full-width">
+              Теги
+              <input type="text" name="tags" placeholder="ГОСТ, практика, презентация">
+            </label>
+            <label class="full-width">
+              Описание
+              <textarea name="description" rows="4" placeholder="Кратко опишите содержание, объём и особенности работы" required></textarea>
+            </label>
+            <label class="work-published-toggle">
+              <input type="checkbox" name="published" checked>
+              Опубликовано на сайте
+            </label>
+            <div class="admin-actions full-width">
+              <button class="button button-primary" type="submit">Сохранить работу</button>
+              <button class="button button-secondary" id="reset-work-form-button" type="button">Очистить</button>
+            </div>
+          </form>
+          <div class="admin-empty" id="works-empty">Войдите, чтобы увидеть работы.</div>
+          <div class="work-admin-list" id="work-admin-list"></div>
 
           <div class="admin-panel-head admin-panel-head-wrap reviews-admin-head">
             <div>

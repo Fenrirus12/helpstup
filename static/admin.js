@@ -7,11 +7,16 @@ const requestList = document.querySelector("#request-list");
 const emptyNode = document.querySelector("#admin-empty");
 const reviewAdminList = document.querySelector("#review-admin-list");
 const reviewsEmptyNode = document.querySelector("#reviews-empty");
+const workAdminForm = document.querySelector("#work-admin-form");
+const workAdminList = document.querySelector("#work-admin-list");
+const worksEmptyNode = document.querySelector("#works-empty");
 const logoutButton = document.querySelector("#logout-button");
 const changeUserButton = document.querySelector("#change-user-button");
 const refreshButton = document.querySelector("#refresh-button");
 const refreshReviewsButton = document.querySelector("#refresh-reviews-button");
+const refreshWorksButton = document.querySelector("#refresh-works-button");
 const resetFiltersButton = document.querySelector("#reset-filters-button");
+const resetWorkFormButton = document.querySelector("#reset-work-form-button");
 const taskTypeFilter = document.querySelector("#task-type-filter");
 const reviewStatusFilter = document.querySelector("#review-status-filter");
 const counterNode = document.querySelector("#admin-counter");
@@ -144,11 +149,19 @@ function renderRequests(items) {
         <p><span>Имя</span>${escapeHtml(item.name)}</p>
         <p><span>Контакт</span>${escapeHtml(item.contact)}</p>
         <p><span>Тип работы</span>${escapeHtml(item.taskType)}</p>
+        <p><span>Антиплагиат</span>${escapeHtml(item.antiPlagiarism || "Не указан")}</p>
         <p><span>Дедлайн</span>${escapeHtml(item.deadline)}</p>
+        <p><span>Аккаунт</span>${item.userId ? `ID ${escapeHtml(item.userId)}` : "Не связан"}</p>
       </div>
       <div class="request-details">
         <span>Описание</span>
         <p>${escapeHtml(item.details).replaceAll("\n", "<br>")}</p>
+        ${item.attachment?.path ? `
+          <a class="chat-attachment" href="${escapeHtml(item.attachment.path)}" target="_blank" rel="noopener noreferrer">
+            <span>Вложение</span>
+            <strong>${escapeHtml(item.attachment.name)}</strong>
+          </a>
+        ` : ""}
       </div>
     `;
     requestList.appendChild(card);
@@ -207,6 +220,50 @@ function renderAdminReviews(items) {
       <div class="admin-actions review-actions">${actions.join("")}</div>
     `;
     reviewAdminList.appendChild(card);
+  });
+}
+
+function renderAdminWorks(items) {
+  if (!workAdminList || !worksEmptyNode) {
+    return;
+  }
+  workAdminList.innerHTML = "";
+  if (!items.length) {
+    worksEmptyNode.hidden = false;
+    worksEmptyNode.textContent = getStoredAuth()
+      ? "Работы пока не добавлены."
+      : "Войдите, чтобы увидеть работы.";
+    return;
+  }
+  worksEmptyNode.hidden = true;
+  items.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "request-card";
+    card.innerHTML = `
+      <div class="request-card-head">
+        <div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(item.workType)} · ${escapeHtml(item.subject)}</span>
+        </div>
+        <span class="review-status ${item.published ? "review-status-approved" : "review-status-pending"}">
+          ${item.published ? "published" : "draft"}
+        </span>
+      </div>
+      <div class="request-grid">
+        <p><span>Оригинальность</span>${escapeHtml(item.originality || "Не указана")}</p>
+        <p><span>Теги</span>${escapeHtml(item.tags || "Без тегов")}</p>
+      </div>
+      <div class="request-details">
+        <span>Описание</span>
+        <p>${escapeHtml(item.description).replaceAll("\n", "<br>")}</p>
+      </div>
+      <div class="admin-actions review-actions">
+        <button class="button button-secondary work-edit" type="button" data-work-id="${escapeHtml(item.id)}">Редактировать</button>
+        <button class="button button-danger work-delete" type="button" data-work-id="${escapeHtml(item.id)}">Удалить</button>
+      </div>
+    `;
+    card.dataset.workPayload = JSON.stringify(item);
+    workAdminList.appendChild(card);
   });
 }
 
@@ -270,6 +327,20 @@ async function loadAdminReviews() {
   } catch (error) {
     renderAdminReviews([]);
     setAdminStatus(error instanceof Error ? error.message : "Ошибка загрузки отзывов.", true);
+  }
+}
+
+async function loadAdminWorks() {
+  if (!getStoredAuth()) {
+    renderAdminWorks([]);
+    return;
+  }
+  try {
+    const result = await fetchAdminJson("/api/admin/works");
+    renderAdminWorks(result.items || []);
+  } catch (error) {
+    renderAdminWorks([]);
+    setAdminStatus(error instanceof Error ? error.message : "Ошибка загрузки работ.", true);
   }
 }
 
@@ -344,6 +415,92 @@ async function deleteReview(reviewId) {
   }
 }
 
+function getWorkPayload() {
+  if (!workAdminForm) {
+    return {};
+  }
+  const formData = new FormData(workAdminForm);
+  return {
+    title: String(formData.get("title") || "").trim(),
+    workType: String(formData.get("workType") || "").trim(),
+    subject: String(formData.get("subject") || "").trim(),
+    originality: String(formData.get("originality") || "").trim(),
+    tags: String(formData.get("tags") || "").trim(),
+    description: String(formData.get("description") || "").trim(),
+    published: Boolean(formData.get("published")),
+  };
+}
+
+function resetWorkForm() {
+  if (!workAdminForm) {
+    return;
+  }
+  workAdminForm.reset();
+  const idInput = workAdminForm.querySelector('input[name="id"]');
+  if (idInput instanceof HTMLInputElement) {
+    idInput.value = "";
+  }
+  const publishedInput = workAdminForm.querySelector('input[name="published"]');
+  if (publishedInput instanceof HTMLInputElement) {
+    publishedInput.checked = true;
+  }
+}
+
+function fillWorkForm(item) {
+  if (!workAdminForm) {
+    return;
+  }
+  const fields = ["id", "title", "workType", "subject", "originality", "tags", "description"];
+  fields.forEach((field) => {
+    const input = workAdminForm.querySelector(`[name="${field}"]`);
+    if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) {
+      input.value = String(item[field] || "");
+    }
+  });
+  const publishedInput = workAdminForm.querySelector('input[name="published"]');
+  if (publishedInput instanceof HTMLInputElement) {
+    publishedInput.checked = Boolean(item.published);
+  }
+  workAdminForm.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+async function saveWork() {
+  if (!workAdminForm) {
+    return;
+  }
+  const idInput = workAdminForm.querySelector('input[name="id"]');
+  const workId = idInput instanceof HTMLInputElement ? idInput.value.trim() : "";
+  const payload = getWorkPayload();
+  setAdminStatus(workId ? `Сохраняю работу #${workId}...` : "Добавляю работу...");
+  try {
+    const result = await fetchAdminJson(workId ? `/api/admin/works/${workId}` : "/api/admin/works", {
+      method: workId ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setAdminStatus(result.message);
+    resetWorkForm();
+    await loadAdminWorks();
+  } catch (error) {
+    setAdminStatus(error instanceof Error ? error.message : "Ошибка сохранения работы.", true);
+  }
+}
+
+async function deleteWork(workId) {
+  const confirmed = window.confirm(`Удалить работу #${workId}? Это действие нельзя отменить.`);
+  if (!confirmed) {
+    return;
+  }
+  setAdminStatus(`Удаляю работу #${workId}...`);
+  try {
+    const result = await fetchAdminJson(`/api/admin/works/${workId}`, { method: "DELETE" });
+    setAdminStatus(result.message);
+    await loadAdminWorks();
+  } catch (error) {
+    setAdminStatus(error instanceof Error ? error.message : "Ошибка удаления работы.", true);
+  }
+}
+
 if (loginForm) {
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -351,6 +508,7 @@ if (loginForm) {
     storeAuth(String(formData.get("username") || "").trim(), String(formData.get("password") || ""));
     await loadRequests();
     await loadAdminReviews();
+    await loadAdminWorks();
   });
 }
 
@@ -377,6 +535,7 @@ if (logoutButton) {
     setAuthorizedState(false);
     renderRequests([]);
     renderAdminReviews([]);
+    renderAdminWorks([]);
     setAdminStatus("Авторизация очищена.");
   });
 }
@@ -387,6 +546,7 @@ if (changeUserButton) {
     setAuthorizedState(false);
     renderRequests([]);
     renderAdminReviews([]);
+    renderAdminWorks([]);
     setAdminStatus("Введите данные другого аккаунта.");
     if (loginForm) {
       loginForm.reset();
@@ -407,6 +567,25 @@ if (refreshButton) {
 if (refreshReviewsButton) {
   refreshReviewsButton.addEventListener("click", () => {
     loadAdminReviews();
+  });
+}
+
+if (refreshWorksButton) {
+  refreshWorksButton.addEventListener("click", () => {
+    loadAdminWorks();
+  });
+}
+
+if (resetWorkFormButton) {
+  resetWorkFormButton.addEventListener("click", () => {
+    resetWorkForm();
+  });
+}
+
+if (workAdminForm) {
+  workAdminForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveWork();
   });
 }
 
@@ -469,6 +648,36 @@ if (reviewAdminList) {
   });
 }
 
+if (workAdminList) {
+  workAdminList.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const card = target.closest(".request-card");
+    if (!(card instanceof HTMLElement)) {
+      return;
+    }
+    const editButton = target.closest(".work-edit");
+    if (editButton) {
+      try {
+        fillWorkForm(JSON.parse(card.dataset.workPayload || "{}"));
+      } catch (error) {
+        setAdminStatus("Не удалось открыть работу для редактирования.", true);
+      }
+      return;
+    }
+    const deleteButton = target.closest(".work-delete");
+    if (deleteButton) {
+      const workId = deleteButton.getAttribute("data-work-id");
+      if (workId) {
+        deleteWork(workId);
+      }
+    }
+  });
+}
+
 setAuthorizedState(Boolean(getStoredAuth()));
 loadRequests();
 loadAdminReviews();
+loadAdminWorks();
